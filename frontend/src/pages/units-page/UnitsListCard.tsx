@@ -48,8 +48,8 @@ export default function UnitsListCard({
   );
 
   return (
-    <TableContainer component={Paper}>
-      <Table size="small">
+    <TableContainer component={Paper} className="units-page__table">
+      <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
             {sortCell('name', t('unitsListCard.name'))}

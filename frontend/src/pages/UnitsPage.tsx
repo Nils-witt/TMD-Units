@@ -129,7 +129,7 @@ export default function UnitsPage() {
   };
 
   return (
-    <Box>
+    <Box className="units-page">
       <div className="units-toolbar">
         <TextField
           label={t('units.searchLabel')}
