@@ -45,7 +45,9 @@ jobs:
           cache: false
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.13
+          # Must be built with Go >= go.mod's version, or typecheck fails
+          # with "export data version 5 is greater than maximum supported".
+          version: v2.15
 
   govulncheck:
     name: Go vulnerability check
