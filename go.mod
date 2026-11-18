@@ -8,7 +8,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/google/uuid v1.6.0
 	golang.org/x/crypto v0.59.0
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/oauth2 v0.38.0
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
 )
