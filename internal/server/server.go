@@ -108,6 +108,8 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	mux.Handle("GET /api/units", authed(s.handleListUnits))
 	mux.Handle("GET /api/units/events", authed(s.handleUnitEvents))
 	mux.Handle("POST /api/units", authed(s.handleCreateUnit))
+	mux.Handle("GET /api/units/csv", authed(s.handleExportUnits))
+	mux.Handle("POST /api/units/csv", authed(s.handleImportUnits))
 	mux.Handle("GET /api/units/{id}", authed(s.handleGetUnit))
 	mux.Handle("GET /api/units/{id}/positions", authed(s.handleUnitPositions))
 	mux.Handle("PUT /api/units/{id}/position", authed(s.handleSetUnitPosition))

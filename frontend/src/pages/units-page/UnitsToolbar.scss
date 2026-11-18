@@ -5,3 +5,14 @@
   gap: 16px;
   margin-bottom: 16px;
 }
+
+.units-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.units-toolbar__notice {
+  margin-bottom: 16px;
+}

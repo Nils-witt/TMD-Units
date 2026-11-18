@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -376,5 +377,76 @@ func TestConnectMovesRequestStatuses(t *testing.T) {
 	}
 	if len(got.StatusRequests) != 1 || got.StatusRequests[0].Code != 5 || !got.StatusRequests[0].Timestamp.Equal(ts) || got.StatusRequests[0].AcknowledgedAt != nil {
 		t.Errorf("requests = %+v, want a pending 5 at %s", got.StatusRequests, ts)
+	}
+}
+
+func TestImport(t *testing.T) {
+	s, user := newDBService(t)
+	ctx := t.Context()
+
+	prefix := rand.Text()[:8]
+	group := models.Group{Name: prefix + "-g"}
+	if err := s.db.Create(&group).Error; err != nil {
+		t.Fatal(err)
+	}
+	existing, err := s.Create(ctx, Input{Name: prefix + "-a", Symbol: &models.UnitSymbol{Grundzeichen: "fahrzeug"}}, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unchanged, err := s.Create(ctx, Input{Name: prefix + "-c"}, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	csv := "id,name,tactical_number,groups\n" +
+		existing.ID.String() + "," + prefix + "-renamed,1," + group.Name + "\n" +
+		"," + prefix + "-b,2,\n" +
+		"," + prefix + "-c,,\n"
+	rows, err := ParseCSV(strings.NewReader(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	imported, err := s.Import(ctx, rows, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(imported) != 3 {
+		t.Fatalf("imported %d units, want 3", len(imported))
+	}
+	a, b, c := imported[0], imported[1], imported[2]
+	if a.Created || a.Unit.ID != existing.ID || a.Unit.Name != prefix+"-renamed" {
+		t.Errorf("by id: %+v, want existing unit renamed", a.Unit)
+	}
+	if a.Unit.Symbol == nil || a.Unit.Symbol.Grundzeichen != "fahrzeug" {
+		t.Errorf("by id: symbol = %v, want kept as the file has no symbol columns", a.Unit.Symbol)
+	}
+	if len(a.Unit.Groups) != 1 || a.Unit.Groups[0].ID != group.ID {
+		t.Errorf("by id: groups = %v, want [%s]", a.Unit.Groups, group.Name)
+	}
+	if !b.Created || b.Unit.TacticalName == nil || b.Unit.TacticalName.Number != "2" {
+		t.Errorf("new: %+v, want created with number 2", b)
+	}
+	if c.Created || c.Unit.ID != unchanged.ID || len(c.Changed) != 0 {
+		t.Errorf("by name: %+v, want matched and unchanged", c)
+	}
+
+	// A failing row rolls back the whole import and names its line.
+	rows, err = ParseCSV(strings.NewReader("name,groups\n" + prefix + "-d,\n" + prefix + "-e," + prefix + "-missing\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Import(ctx, rows, user); !errors.Is(err, ErrGroupNotFound) || !strings.Contains(err.Error(), "line 3") {
+		t.Errorf("unknown group: err = %v, want ErrGroupNotFound on line 3", err)
+	}
+	rows, err = ParseCSV(strings.NewReader("name\n" + prefix + "-d\n" + prefix + "-d\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Import(ctx, rows, user); !errors.Is(err, ErrInvalidCSV) {
+		t.Errorf("duplicate row: err = %v, want ErrInvalidCSV", err)
+	}
+	var count int64
+	if err := s.db.Model(&models.Unit{}).Where("name = ?", prefix+"-d").Count(&count).Error; err != nil || count != 0 {
+		t.Errorf("after failed imports: %d units named %s-d, err = %v; want none", count, prefix, err)
 	}
 }

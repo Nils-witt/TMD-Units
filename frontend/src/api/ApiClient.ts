@@ -27,6 +27,7 @@ import type {
   SyncRemote,
   SyncRemoteInput,
   Unit,
+  UnitImportResult,
   UnitInput,
   UpdateUserInput,
   User,
@@ -308,6 +309,24 @@ export class ApiClient {
     if (range.to) params.set('to', range.to);
     const query = params.size > 0 ? `?${params}` : '';
     return this.getJson(`/api/units/${id}/positions${query}`);
+  }
+
+  /** The local units as CSV (GET /api/units/csv); the groups column is only
+   * included for administrators. */
+  async exportUnitsCsv(): Promise<Blob> {
+    const res = await this.request('/api/units/csv');
+    return res.blob();
+  }
+
+  /** Creates and updates units from a CSV file: all rows or, on any error,
+   * none. Rows match units by id, then by name. */
+  async importUnitsCsv(file: Blob): Promise<UnitImportResult> {
+    const res = await this.request('/api/units/csv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/csv' },
+      body: file,
+    });
+    return (await res.json()) as UnitImportResult;
   }
 
   deleteUnit(id: string): Promise<void> {

@@ -876,6 +876,87 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/units/csv:
+    get:
+      tags: [units]
+      summary: Export units as CSV
+      description: >-
+        The local units (not those synced from other instances) as UTF-8 CSV
+        with a BOM and a header row: `id`, `name`, the tactical name parts
+        `tactical_organisation`, `tactical_regional_association`,
+        `tactical_local_association`, `tactical_function`, `tactical_number`,
+        the symbol components `symbol_grundzeichen`, `symbol_organisation`,
+        `symbol_fachaufgabe`, `symbol_einheit`, `symbol_verwaltungsstufe`,
+        `symbol_funktion`, `symbol_symbol` and, for administrators only,
+        `groups` (group names separated by `|`). Positions and statuses are
+        not exported.
+      operationId: exportUnitsCsv
+      responses:
+        "200":
+          description: The units as CSV.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: '`attachment; filename="units-YYYY-MM-DD.csv"`'
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [units]
+      summary: Import units from CSV
+      description: >-
+        Creates and updates units from a CSV file in the export's format,
+        delimited by commas or semicolons, of at most 4 MiB and 10000 rows.
+        Columns may come in any order; only `name` is required and unknown
+        columns are rejected. A row updates the unit with its `id` or, failing
+        that, its `name`, and creates a unit otherwise. Columns missing from
+        the file leave those fields of updated units unchanged; empty cells
+        clear them. Only administrators may send a `groups` column, whose
+        groups must exist. The import is atomic: on any error nothing is
+        imported, and the error names the offending line.
+      operationId: importUnitsCsv
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: How many units were created, updated and left unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: >-
+            A row names a unit synced from another instance, or a unit name
+            that is already taken.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: The file is larger than 4 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/units/events:
     get:
       tags: [units]
@@ -1412,6 +1493,16 @@ components:
             error: internal error
 
   schemas:
+    UnitImportResult:
+      type: object
+      required: [created, updated, unchanged]
+      properties:
+        created:
+          type: integer
+        updated:
+          type: integer
+        unchanged:
+          type: integer
     Error:
       type: object
       required: [error]

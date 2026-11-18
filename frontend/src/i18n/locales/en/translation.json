@@ -162,7 +162,11 @@
     "searchLabel": "Search units",
     "newUnit": "New unit",
     "deleteUnitTitle": "Delete unit",
-    "deleteUnitMessage": "Delete unit \"{{name}}\"?"
+    "deleteUnitMessage": "Delete unit \"{{name}}\"?",
+    "exportCsv": "Export CSV",
+    "importCsv": "Import CSV",
+    "importing": "Importing…",
+    "importResult": "Import finished: {{created}} created, {{updated}} updated, {{unchanged}} unchanged."
   },
   "unitDialog": {
     "nameLabel": "Name",

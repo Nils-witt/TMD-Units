@@ -144,6 +144,22 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (*models.Unit, error) {
 }
 
 func (s *Service) Create(ctx context.Context, in Input, by *models.User) (*models.Unit, error) {
+	var unit *models.Unit
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		unit, err = createTx(tx, in, by)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	unit.CreatedBy, unit.UpdatedBy = by, by
+	s.events.Publish(Event{Type: EventCreated, ID: unit.ID, Unit: unit})
+	return unit, nil
+}
+
+// createTx creates a unit from in within tx.
+func createTx(tx *gorm.DB, in Input, by *models.User) (*models.Unit, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, fmt.Errorf("generate unit id: %w", err)
@@ -152,25 +168,20 @@ func (s *Service) Create(ctx context.Context, in Input, by *models.User) (*model
 	if err := apply(unit, in); err != nil {
 		return nil, err
 	}
-	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		groups, err := findGroups(tx, in.GroupIDs)
-		if err != nil {
-			return err
-		}
-		if err := tx.Create(unit).Error; err != nil {
-			return mapWriteError(err, "create unit")
-		}
-		if err := replaceGroups(tx, unit.ID, groups); err != nil {
-			return err
-		}
-		unit.Groups = groups
-		return recordPosition(tx, unit, by)
-	})
+	groups, err := findGroups(tx, in.GroupIDs)
 	if err != nil {
 		return nil, err
 	}
-	unit.CreatedBy, unit.UpdatedBy = by, by
-	s.events.Publish(Event{Type: EventCreated, ID: unit.ID, Unit: unit})
+	if err := tx.Create(unit).Error; err != nil {
+		return nil, mapWriteError(err, "create unit")
+	}
+	if err := replaceGroups(tx, unit.ID, groups); err != nil {
+		return nil, err
+	}
+	unit.Groups = groups
+	if err := recordPosition(tx, unit, by); err != nil {
+		return nil, err
+	}
 	return unit, nil
 }
 
@@ -267,68 +278,9 @@ func (s *Service) AcknowledgeRequest(ctx context.Context, id uuid.UUID, code int
 func (s *Service) Patch(ctx context.Context, id uuid.UUID, patch func(*Input), by *models.User) (*models.Unit, []Field, error) {
 	var changed []Field
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Lock the row so concurrent updates can't both miss a position change.
-		var unit models.Unit
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&unit, "id = ?", id).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrUnitNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("get unit %s: %w", id, err)
-		}
-		if unit.SyncRemoteID != nil {
-			return ErrUnitSynced
-		}
-		if unit.Groups, err = loadGroups(tx, id); err != nil {
-			return err
-		}
-		if unit.StatusRequests, err = loadRequests(tx, id); err != nil {
-			return err
-		}
-		before := unit
-		in := inputOf(&unit)
-		patch(&in)
-		if err := apply(&unit, in); err != nil {
-			return err
-		}
-		// Only look the groups up when they change: positions are patched
-		// far more often than groups.
-		if !slices.Equal(groupIDs(unit.Groups), normalizeGroupIDs(in.GroupIDs)) {
-			if unit.Groups, err = findGroups(tx, in.GroupIDs); err != nil {
-				return err
-			}
-		}
-		changed = Changed(&before, &unit)
-		// Nothing to write: leave updated_at and updated_by alone and don't
-		// wake up every event stream.
-		if len(changed) == 0 {
-			return nil
-		}
-		unit.UpdatedByID = &by.ID
-		// Select("*") so a cleared position is written as NULLs too.
-		res := tx.Model(&unit).
-			Select("*").Omit("id", "created_at", "created_by_id", clause.Associations).
-			Updates(&unit)
-		if res.Error != nil {
-			return mapWriteError(res.Error, fmt.Sprintf("update unit %s", id))
-		}
-		if res.RowsAffected == 0 {
-			return ErrUnitNotFound
-		}
-		if slices.Contains(changed, FieldGroups) {
-			if err := replaceGroups(tx, id, unit.Groups); err != nil {
-				return err
-			}
-		}
-		if slices.Contains(changed, FieldStatusRequests) {
-			if err := replaceRequests(tx, id, unit.StatusRequests); err != nil {
-				return err
-			}
-		}
-		if samePosition(&before, &unit) {
-			return nil
-		}
-		return recordPosition(tx, &unit, by)
+		var err error
+		changed, err = patchTx(tx, id, patch, by)
+		return err
 	})
 	if err != nil {
 		return nil, nil, err
@@ -341,6 +293,75 @@ func (s *Service) Patch(ctx context.Context, id uuid.UUID, patch func(*Input), b
 		s.events.Publish(Event{Type: EventUpdated, ID: id, Unit: updated})
 	}
 	return updated, changed, nil
+}
+
+// patchTx applies patch to the unit within tx (see Patch) and returns which
+// fields changed.
+func patchTx(tx *gorm.DB, id uuid.UUID, patch func(*Input), by *models.User) ([]Field, error) {
+	// Lock the row so concurrent updates can't both miss a position change.
+	var unit models.Unit
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&unit, "id = ?", id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUnitNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get unit %s: %w", id, err)
+	}
+	if unit.SyncRemoteID != nil {
+		return nil, ErrUnitSynced
+	}
+	if unit.Groups, err = loadGroups(tx, id); err != nil {
+		return nil, err
+	}
+	if unit.StatusRequests, err = loadRequests(tx, id); err != nil {
+		return nil, err
+	}
+	before := unit
+	in := inputOf(&unit)
+	patch(&in)
+	if err := apply(&unit, in); err != nil {
+		return nil, err
+	}
+	// Only look the groups up when they change: positions are patched
+	// far more often than groups.
+	if !slices.Equal(groupIDs(unit.Groups), normalizeGroupIDs(in.GroupIDs)) {
+		if unit.Groups, err = findGroups(tx, in.GroupIDs); err != nil {
+			return nil, err
+		}
+	}
+	changed := Changed(&before, &unit)
+	// Nothing to write: leave updated_at and updated_by alone and don't
+	// wake up every event stream.
+	if len(changed) == 0 {
+		return nil, nil
+	}
+	unit.UpdatedByID = &by.ID
+	// Select("*") so a cleared position is written as NULLs too.
+	res := tx.Model(&unit).
+		Select("*").Omit("id", "created_at", "created_by_id", clause.Associations).
+		Updates(&unit)
+	if res.Error != nil {
+		return nil, mapWriteError(res.Error, fmt.Sprintf("update unit %s", id))
+	}
+	if res.RowsAffected == 0 {
+		return nil, ErrUnitNotFound
+	}
+	if slices.Contains(changed, FieldGroups) {
+		if err := replaceGroups(tx, id, unit.Groups); err != nil {
+			return nil, err
+		}
+	}
+	if slices.Contains(changed, FieldStatusRequests) {
+		if err := replaceRequests(tx, id, unit.StatusRequests); err != nil {
+			return nil, err
+		}
+	}
+	if !samePosition(&before, &unit) {
+		if err := recordPosition(tx, &unit, by); err != nil {
+			return nil, err
+		}
+	}
+	return changed, nil
 }
 
 // Delete removes the unit and returns it as it was. Units synced from another

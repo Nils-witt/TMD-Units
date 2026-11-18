@@ -271,6 +271,13 @@ export interface UnitInput {
   groupIds?: number[];
 }
 
+/** The result of a CSV import (POST /api/units/csv). */
+export interface UnitImportResult {
+  created: number;
+  updated: number;
+  unchanged: number;
+}
+
 /** A message on the unit event stream (GET /api/units/events). */
 export type UnitEvent =
   { type: 'created' | 'updated'; id: string; unit: Unit } | { type: 'deleted'; id: string };

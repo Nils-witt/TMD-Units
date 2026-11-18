@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
-import { Box, Button, TextField } from '@mui/material';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { Alert, Box, Button, TextField } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
 import { useTranslation } from 'react-i18next';
-import type { Unit } from '../api/types';
+import type { Unit, UnitImportResult } from '../api/types';
 import ErrorBanner from '../components/ErrorBanner';
 import { useApi } from '../hooks/useApi';
 import { useConfirm } from '../hooks/useConfirm';
@@ -31,6 +33,9 @@ export default function UnitsPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyUnit, setHistoryUnit] = useState<Unit | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<UnitImportResult | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const visibleUnits = useMemo(
     () => sortUnits(filterUnits(units, search), sortKey, sortDirection),
@@ -90,6 +95,39 @@ export default function UnitsPage() {
     }
   };
 
+  const onExport = async () => {
+    setError(null);
+    try {
+      const blob = await api.exportUnitsCsv();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `units-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  const onImport = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset so choosing the same file again fires another change.
+    e.target.value = '';
+    if (!file) return;
+    setError(null);
+    setImportResult(null);
+    setImporting(true);
+    try {
+      setImportResult(await api.importUnitsCsv(file));
+      await reloadUnits();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <Box>
       <div className="units-toolbar">
@@ -99,11 +137,39 @@ export default function UnitsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => openDialog(null)}>
-          {t('units.newUnit')}
-        </Button>
+        <div className="units-toolbar__actions">
+          <Button startIcon={<FileDownloadIcon />} onClick={() => void onExport()}>
+            {t('units.exportCsv')}
+          </Button>
+          <Button
+            startIcon={<FileUploadIcon />}
+            disabled={importing}
+            onClick={() => fileInput.current?.click()}
+          >
+            {importing ? t('units.importing') : t('units.importCsv')}
+          </Button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".csv,text/csv"
+            hidden
+            onChange={(e) => void onImport(e)}
+          />
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => openDialog(null)}>
+            {t('units.newUnit')}
+          </Button>
+        </div>
       </div>
       <ErrorBanner message={error ?? loadError} />
+      {importResult && (
+        <Alert
+          severity="success"
+          className="units-toolbar__notice"
+          onClose={() => setImportResult(null)}
+        >
+          {t('units.importResult', { ...importResult })}
+        </Alert>
+      )}
       <UnitsListCard
         units={visibleUnits}
         loading={loading}

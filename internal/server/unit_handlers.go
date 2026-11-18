@@ -617,7 +617,7 @@ func writeUnitError(w http.ResponseWriter, err error) {
 	case errors.Is(err, units.ErrInvalidName), errors.Is(err, units.ErrInvalidPosition),
 		errors.Is(err, units.ErrInvalidSymbol), errors.Is(err, units.ErrInvalidTacticalName),
 		errors.Is(err, units.ErrGroupNotFound), errors.Is(err, units.ErrInvalidStatus),
-		errors.Is(err, units.ErrInvalidRequest):
+		errors.Is(err, units.ErrInvalidRequest), errors.Is(err, units.ErrInvalidCSV):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		slog.Error("unit management", "err", err)
