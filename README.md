@@ -79,6 +79,10 @@ Behind a reverse proxy, set `TRUSTED_PROXIES` to its addresses (comma-separated 
 
 The unit position history is kept forever unless `POSITION_HISTORY_RETENTION` is set to a duration (e.g. `720h` for 30 days); older positions are then deleted hourly, except each unit's newest one.
 
+### Service discovery
+
+With `AMQP_URL` and `SERVICE_DISCOVERY_SECRET` (shared by the TMD services, at least 32 bytes) set, the server announces itself at `SERVICE_URL` (e.g. `http://units:8080`) on the RabbitMQ topic exchange `tmd.services` every `SERVICE_ANNOUNCE_INTERVAL` (default `1m`), and hands API tokens to the services listed in `SERVICE_TOKEN_CLIENTS` (default `api`): the TMD API finds the units server this way, without a hand-made token. Requests and replies are signed with the secret, and the token travels encrypted. Each token acts as the account `service:<client>` (created on first use; not an administrator, no password, so nobody can sign in as it), lasts `SERVICE_TOKEN_TTL` (default `168h`) and replaces the token that instance of the service had before. Issued tokens appear in the audit log. Deleting the account ends its tokens; the service gets a new one on its next 401. `internal/servicebus` is a verbatim copy of the tile server's package (also in address-serv and the API); keep all copies identical.
+
 ### Audit log
 
 Administrators can see who signed in (and who failed to), and who created, changed or deleted which users, API tokens, API keys, sync remotes and units, on the Audit log page or at `GET /api/audit-log`. A unit's position is never recorded, including removing it, since the position history already covers it; an update that changes only the position leaves no entry. Entries are kept forever unless `AUDIT_LOG_RETENTION` is set to a duration (e.g. `2160h` for 90 days); older entries are then deleted hourly.

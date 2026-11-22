@@ -201,6 +201,11 @@ type newSession struct {
 // an access token. The token's "jti" is the session's random ID, of which
 // only a hash is stored, so a database leak does not expose live sessions.
 func (s *Service) createSession(ctx context.Context, session models.Session, ttl time.Duration) (*newSession, error) {
+	return s.createSessionIn(ctx, s.db, session, ttl)
+}
+
+// createSessionIn is createSession within db, e.g. a transaction.
+func (s *Service) createSessionIn(ctx context.Context, db *gorm.DB, session models.Session, ttl time.Duration) (*newSession, error) {
 	sessionID, err := newSessionID()
 	if err != nil {
 		return nil, err
@@ -214,7 +219,7 @@ func (s *Service) createSession(ctx context.Context, session models.Session, ttl
 	if err != nil {
 		return nil, err
 	}
-	if err := s.db.WithContext(ctx).Create(&session).Error; err != nil {
+	if err := db.WithContext(ctx).Create(&session).Error; err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
 	}
 	return &newSession{Session: session, token: token}, nil

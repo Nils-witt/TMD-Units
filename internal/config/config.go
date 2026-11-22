@@ -57,6 +57,10 @@ type Config struct {
 	OIDC auth.OIDCConfig
 	// OIDCDisplayName labels the SSO button on the login page.
 	OIDCDisplayName string
+
+	// Discovery announces this server on the message broker and hands
+	// API tokens to the other services.
+	Discovery Discovery
 }
 
 func Load() (*Config, error) {
@@ -101,7 +105,13 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid CORS_ALLOWED_ORIGINS: %w", err)
 	}
 
+	discovery, err := loadDiscovery()
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
+		Discovery:                discovery,
 		Addr:                     getEnv("ADDR", ":8080"),
 		DatabaseURL:              getEnv("DATABASE_URL", "postgres://app:app@localhost:5432/app?sslmode=disable"),
 		SessionTTL:               ttl,

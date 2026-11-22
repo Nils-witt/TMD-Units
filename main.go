@@ -159,6 +159,9 @@ func run() error {
 		return err
 	}
 	slog.Info("server identity", "uuid", serverUUID, "keysDir", cfg.KeysDir)
+	if err := startDiscovery(ctx, cfg.Discovery, authService, auditService, cfg.InstanceName); err != nil {
+		return err
+	}
 	syncManager := remotesync.NewManager(db, unitService, serverKey, serverUUID)
 	syncDone := make(chan struct{})
 	go func() {
