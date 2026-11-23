@@ -242,6 +242,33 @@
     "function": "Function",
     "number": "Number"
   },
+  "unitAttributes": {
+    "title": "Attributes",
+    "none": "No attributes",
+    "key": "Name",
+    "type": "Type",
+    "value": "Value",
+    "add": "Add attribute",
+    "remove": "Remove attribute",
+    "yes": "Yes",
+    "no": "No",
+    "types": {
+      "text": "Text",
+      "number": "Number",
+      "boolean": "Yes/No",
+      "date": "Date",
+      "url": "Link"
+    },
+    "errors": {
+      "keyRequired": "Name required",
+      "keyDuplicate": "Name used twice",
+      "keyInvalid": "Invalid name",
+      "text": "Text too long or has invalid characters",
+      "number": "Enter a number",
+      "date": "Enter a valid date",
+      "url": "Enter an http(s) link"
+    }
+  },
   "map": {
     "empty": "No unit has a position yet",
     "setPosition": "Set new position",
@@ -322,7 +349,8 @@
         "name": "name",
         "symbol": "tactical symbol",
         "tacticalName": "tactical name",
-        "mapStyleUrl": "map style"
+        "mapStyleUrl": "map style",
+        "attributes": "attributes"
       },
       "enabled": "enabled",
       "disabled": "disabled"

@@ -46,14 +46,18 @@ type unitRequest struct {
 	// Symbol's and TacticalName's JSON shapes are defined by their struct tags.
 	Symbol       *models.UnitSymbol   `json:"symbol"`
 	TacticalName *models.TacticalName `json:"tacticalName"`
+	// Attributes replaces the unit's free attributes; null, missing or empty
+	// clears them.
+	Attributes []models.UnitAttribute `json:"attributes"`
 	// GroupIDs replaces the unit's groups; null or missing keeps them (on
 	// create: none). Only administrators may send it.
 	GroupIDs []uint `json:"groupIds"`
 }
 
 // unitPatchRequest is the body of a patch. A missing field is left
-// unchanged; a null symbol, tactical name or group list clears it. Symbol,
-// tactical name and groups are replaced as a whole, not merged. Position is
+// unchanged; a null symbol, tactical name, attribute list or group list
+// clears it. Symbol, tactical name, attributes and groups are replaced as a
+// whole, not merged. Position is
 // only there to be rejected, as in unitRequest.
 type unitPatchRequest struct {
 	Name         json.RawMessage `json:"name"`
@@ -61,6 +65,7 @@ type unitPatchRequest struct {
 	Status       json.RawMessage `json:"status"`
 	Symbol       json.RawMessage `json:"symbol"`
 	TacticalName json.RawMessage `json:"tacticalName"`
+	Attributes   json.RawMessage `json:"attributes"`
 	GroupIDs     json.RawMessage `json:"groupIds"`
 }
 
@@ -79,10 +84,12 @@ type unitResponse struct {
 	Status       *statusJSON          `json:"status"`
 	Symbol       *models.UnitSymbol   `json:"symbol"`
 	TacticalName *models.TacticalName `json:"tacticalName"`
-	CreatedAt    time.Time            `json:"createdAt"`
-	UpdatedAt    time.Time            `json:"updatedAt"`
-	CreatedBy    *userRefResponse     `json:"createdBy"`
-	UpdatedBy    *userRefResponse     `json:"updatedBy"`
+	// Attributes are the unit's free attributes in their order; never null.
+	Attributes []models.UnitAttribute `json:"attributes"`
+	CreatedAt  time.Time              `json:"createdAt"`
+	UpdatedAt  time.Time              `json:"updatedAt"`
+	CreatedBy  *userRefResponse       `json:"createdBy"`
+	UpdatedBy  *userRefResponse       `json:"updatedBy"`
 	// SyncedFrom names the instance the unit is mirrored from; null for
 	// local units. Synced units can only be changed there.
 	SyncedFrom *syncRemoteRefResponse `json:"syncedFrom"`
@@ -134,6 +141,7 @@ func toUnitResponse(u *models.Unit) unitResponse {
 		Name:         u.Name,
 		Symbol:       u.Symbol,
 		TacticalName: u.TacticalName,
+		Attributes:   u.Attributes,
 		CreatedAt:    u.CreatedAt,
 		UpdatedAt:    u.UpdatedAt,
 		CreatedBy:    toUserRef(u.CreatedBy),
@@ -143,6 +151,9 @@ func toUnitResponse(u *models.Unit) unitResponse {
 	}
 	for i, r := range u.StatusRequests {
 		resp.Requests[i] = statusRequestJSON{Code: r.Code, Timestamp: r.Timestamp, AcknowledgedAt: r.AcknowledgedAt, AcknowledgedBy: r.AcknowledgedBy}
+	}
+	if resp.Attributes == nil {
+		resp.Attributes = []models.UnitAttribute{}
 	}
 	if u.SyncRemote != nil {
 		resp.SyncedFrom = &syncRemoteRefResponse{ID: u.SyncRemote.ID, Name: u.SyncRemote.Name}
@@ -191,7 +202,10 @@ func toUserRef(u *models.User) *userRefResponse {
 }
 
 func (req *unitRequest) input() units.Input {
-	return units.Input{Name: req.Name, Symbol: req.Symbol, TacticalName: req.TacticalName, GroupIDs: req.GroupIDs}
+	return units.Input{
+		Name: req.Name, Symbol: req.Symbol, TacticalName: req.TacticalName,
+		Attributes: req.Attributes, GroupIDs: req.GroupIDs,
+	}
 }
 
 // errGroupsAdminOnly is returned when a non-administrator tries to change a
@@ -259,6 +273,7 @@ func (req *unitPatchRequest) patch() (func(*units.Input), error) {
 		{req.Name, &fields.Name},
 		{req.Symbol, &fields.Symbol},
 		{req.TacticalName, &fields.TacticalName},
+		{req.Attributes, &fields.Attributes},
 		{req.GroupIDs, &fields.GroupIDs},
 	} {
 		if f.raw == nil {
@@ -281,6 +296,9 @@ func (req *unitPatchRequest) patch() (func(*units.Input), error) {
 		}
 		if req.TacticalName != nil {
 			in.TacticalName = patched.TacticalName
+		}
+		if req.Attributes != nil {
+			in.Attributes = patched.Attributes
 		}
 		if req.GroupIDs != nil {
 			in.GroupIDs = patched.GroupIDs
@@ -615,7 +633,7 @@ func writeUnitError(w http.ResponseWriter, err error) {
 	case errors.Is(err, units.ErrNameTaken), errors.Is(err, units.ErrUnitSynced):
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, units.ErrInvalidName), errors.Is(err, units.ErrInvalidPosition),
-		errors.Is(err, units.ErrInvalidSymbol), errors.Is(err, units.ErrInvalidTacticalName),
+		errors.Is(err, units.ErrInvalidSymbol), errors.Is(err, units.ErrInvalidTacticalName), errors.Is(err, units.ErrInvalidAttributes),
 		errors.Is(err, units.ErrGroupNotFound), errors.Is(err, units.ErrInvalidStatus),
 		errors.Is(err, units.ErrInvalidRequest), errors.Is(err, units.ErrInvalidCSV):
 		writeError(w, http.StatusBadRequest, err.Error())

@@ -211,6 +211,18 @@ export interface TacticalName {
   number?: string;
 }
 
+/** The type of a unit attribute's value. */
+export type UnitAttributeType = 'text' | 'number' | 'boolean' | 'date' | 'url';
+
+/** A freely defined attribute of a unit; `value` matches `type`. Dates are
+ * YYYY-MM-DD, URLs absolute http(s). */
+export type UnitAttribute =
+  | { key: string; type: 'text'; value: string }
+  | { key: string; type: 'number'; value: number }
+  | { key: string; type: 'boolean'; value: boolean }
+  | { key: string; type: 'date'; value: string }
+  | { key: string; type: 'url'; value: string };
+
 /** A unit's FMS status: 0 to 9, see `fmsStatusColor`. */
 export interface UnitStatus {
   code: number;
@@ -236,6 +248,8 @@ export interface Unit {
   status: UnitStatus | null;
   symbol: UnitSymbol | null;
   tacticalName: TacticalName | null;
+  /** The unit's free attributes, in their order. */
+  attributes: UnitAttribute[];
   createdAt: string;
   updatedAt: string;
   createdBy: UserRef | null;
@@ -266,6 +280,8 @@ export interface UnitInput {
   symbol: UnitSymbol | null;
   /** Null clears the tactical name. */
   tacticalName: TacticalName | null;
+  /** Replaces the unit's attributes; empty clears them. */
+  attributes: UnitAttribute[];
   /** Replaces the unit's groups; omitted keeps them. Only administrators may
    * send it. */
   groupIds?: number[];

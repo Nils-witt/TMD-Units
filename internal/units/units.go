@@ -101,6 +101,8 @@ type Input struct {
 	Status       *Status
 	Symbol       *models.UnitSymbol
 	TacticalName *models.TacticalName
+	// Attributes are the unit's free attributes; nil or empty clears them.
+	Attributes []models.UnitAttribute
 	// StatusRequests are the unit's status requests, at most one per code.
 	StatusRequests []StatusRequest
 	// GroupIDs are the groups the unit is assigned to; duplicates are
@@ -395,6 +397,7 @@ const (
 	FieldSymbol         Field = "symbol"
 	FieldTacticalName   Field = "tacticalName"
 	FieldGroups         Field = "groups"
+	FieldAttributes     Field = "attributes"
 )
 
 // Changed returns the editable fields that differ between a and b.
@@ -420,6 +423,9 @@ func Changed(a, b *models.Unit) []Field {
 	}
 	if !slices.Equal(groupIDs(a.Groups), groupIDs(b.Groups)) {
 		changed = append(changed, FieldGroups)
+	}
+	if !sameAttributes(a.Attributes, b.Attributes) {
+		changed = append(changed, FieldAttributes)
 	}
 	return changed
 }
@@ -667,7 +673,10 @@ func (s *Service) preload(ctx context.Context) *gorm.DB {
 
 // inputOf returns the unit's editable fields.
 func inputOf(unit *models.Unit) Input {
-	in := Input{Name: unit.Name, Symbol: unit.Symbol, TacticalName: unit.TacticalName, GroupIDs: groupIDs(unit.Groups)}
+	in := Input{
+		Name: unit.Name, Symbol: unit.Symbol, TacticalName: unit.TacticalName,
+		Attributes: unit.Attributes, GroupIDs: groupIDs(unit.Groups),
+	}
 	if unit.Status != nil && unit.StatusTimestamp != nil {
 		in.Status = &Status{Code: *unit.Status, Timestamp: *unit.StatusTimestamp}
 	}
@@ -709,6 +718,12 @@ func apply(unit *models.Unit, in Input) error {
 		return err
 	}
 	unit.TacticalName = tacticalName
+
+	attributes, err := normalizeAttributes(in.Attributes)
+	if err != nil {
+		return err
+	}
+	unit.Attributes = attributes
 
 	if in.Status == nil {
 		unit.Status, unit.StatusTimestamp = nil, nil

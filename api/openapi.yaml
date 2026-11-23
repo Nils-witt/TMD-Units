@@ -887,9 +887,10 @@ paths:
         `tactical_local_association`, `tactical_function`, `tactical_number`,
         the symbol components `symbol_grundzeichen`, `symbol_organisation`,
         `symbol_fachaufgabe`, `symbol_einheit`, `symbol_verwaltungsstufe`,
-        `symbol_funktion`, `symbol_symbol` and, for administrators only,
-        `groups` (group names separated by `|`). Positions and statuses are
-        not exported.
+        `symbol_funktion`, `symbol_symbol`, `attributes` (the unit's
+        attributes as a JSON array of `UnitAttribute`, empty when it has
+        none) and, for administrators only, `groups` (group names separated
+        by `|`). Positions and statuses are not exported.
       operationId: exportUnitsCsv
       responses:
         "200":
@@ -1009,8 +1010,8 @@ paths:
       tags: [units]
       summary: Update a unit
       description: >
-        Replaces the unit's name, symbol and tactical name; a missing or null
-        symbol or tactical name clears it. Its groups are replaced only when
+        Replaces the unit's name, symbol, tactical name and attributes; a
+        missing or null symbol, tactical name or attribute list clears it. Its groups are replaced only when
         `groupIds` is sent. The position is left alone; it is
         set via `PUT /api/units/{id}/position` and the status via `PUT /api/units/{id}/status`; a body with `position` or `status` is
         rejected.
@@ -1045,8 +1046,8 @@ paths:
       summary: Partially update a unit
       description: >
         Changes only the fields present in the body. A null symbol, tactical
-        name or `groupIds` clears it; symbol, tactical name and groups are
-        replaced as a whole, not merged. The position and status are set via their own endpoints, and a
+        name, `attributes` or `groupIds` clears it; symbol, tactical name,
+        attributes and groups are replaced as a whole, not merged. The position and status are set via their own endpoints, and a
         body with `position` or `status` is rejected.
       operationId: patchUnit
       requestBody:
@@ -1760,7 +1761,7 @@ components:
             Action-specific values: `method` (password or oidc) for sign-ins,
             `isAdmin` and `passwordChanged` for user updates, `userId`,
             `username` and `expiresAt` for API tokens, `changed` (the changed
-            fields among name, symbol and tacticalName) for unit updates.
+            fields among name, symbol, tacticalName, attributes and groups) for unit updates.
         remoteAddr:
           type: string
           description: The client's IP address.
@@ -1870,6 +1871,11 @@ components:
           oneOf:
             - $ref: "#/components/schemas/TacticalName"
             - type: "null"
+        attributes:
+          description: Replaces the unit's attributes; missing, null or empty clears them.
+          oneOf:
+            - $ref: "#/components/schemas/UnitAttributes"
+            - type: "null"
         groupIds:
           description: >-
             Replaces the unit's groups; missing or null keeps them (on create:
@@ -1897,11 +1903,122 @@ components:
           oneOf:
             - $ref: "#/components/schemas/TacticalName"
             - type: "null"
+        attributes:
+          description: Replaces the unit's attributes; null or empty clears them.
+          oneOf:
+            - $ref: "#/components/schemas/UnitAttributes"
+            - type: "null"
         groupIds:
           description: Replaces the unit's groups; null removes it from all.
           oneOf:
             - $ref: "#/components/schemas/UnitGroupIds"
             - type: "null"
+
+    UnitAttributes:
+      type: array
+      maxItems: 50
+      description: >
+        Freely defined attributes of a unit, in the order given. Keys are
+        trimmed and must be unique, ignoring case.
+      items:
+        $ref: "#/components/schemas/UnitAttribute"
+      example:
+        - { key: Kennzeichen, type: text, value: B-RK 1234 }
+        - { key: Sitzplätze, type: number, value: 4 }
+        - { key: Allrad, type: boolean, value: true }
+        - { key: TÜV bis, type: date, value: "2027-03-31" }
+        - { key: Handbuch, type: url, value: "https://example.com/handbuch.pdf" }
+
+    UnitAttribute:
+      description: >
+        One attribute of a unit. `value` must match `type`; it is stored and
+        served in canonical form (e.g. `4.0` becomes `4`).
+      oneOf:
+        - $ref: "#/components/schemas/UnitAttributeText"
+        - $ref: "#/components/schemas/UnitAttributeNumber"
+        - $ref: "#/components/schemas/UnitAttributeBoolean"
+        - $ref: "#/components/schemas/UnitAttributeDate"
+        - $ref: "#/components/schemas/UnitAttributeUrl"
+      discriminator:
+        propertyName: type
+        mapping:
+          text: "#/components/schemas/UnitAttributeText"
+          number: "#/components/schemas/UnitAttributeNumber"
+          boolean: "#/components/schemas/UnitAttributeBoolean"
+          date: "#/components/schemas/UnitAttributeDate"
+          url: "#/components/schemas/UnitAttributeUrl"
+
+    UnitAttributeKey:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Surrounding whitespace is trimmed; must not contain control characters.
+
+    UnitAttributeText:
+      type: object
+      required: [key, type, value]
+      properties:
+        key:
+          $ref: "#/components/schemas/UnitAttributeKey"
+        type:
+          type: string
+          const: text
+        value:
+          type: string
+          maxLength: 1024
+          description: No control characters other than newlines and tabs.
+
+    UnitAttributeNumber:
+      type: object
+      required: [key, type, value]
+      properties:
+        key:
+          $ref: "#/components/schemas/UnitAttributeKey"
+        type:
+          type: string
+          const: number
+        value:
+          type: number
+
+    UnitAttributeBoolean:
+      type: object
+      required: [key, type, value]
+      properties:
+        key:
+          $ref: "#/components/schemas/UnitAttributeKey"
+        type:
+          type: string
+          const: boolean
+        value:
+          type: boolean
+
+    UnitAttributeDate:
+      type: object
+      required: [key, type, value]
+      properties:
+        key:
+          $ref: "#/components/schemas/UnitAttributeKey"
+        type:
+          type: string
+          const: date
+        value:
+          type: string
+          format: date
+
+    UnitAttributeUrl:
+      type: object
+      required: [key, type, value]
+      properties:
+        key:
+          $ref: "#/components/schemas/UnitAttributeKey"
+        type:
+          type: string
+          const: url
+        value:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: An absolute http or https URL.
 
     TacticalName:
       type: object
@@ -1992,6 +2109,7 @@ components:
           status,
           symbol,
           tacticalName,
+          attributes,
           createdAt,
           updatedAt,
           createdBy,
@@ -2028,6 +2146,8 @@ components:
           oneOf:
             - $ref: "#/components/schemas/TacticalName"
             - type: "null"
+        attributes:
+          $ref: "#/components/schemas/UnitAttributes"
         createdAt:
           type: string
           format: date-time

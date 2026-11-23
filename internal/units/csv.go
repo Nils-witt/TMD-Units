@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +31,9 @@ const (
 	// ColumnGroups holds the names of the unit's groups, joined by
 	// GroupSeparator.
 	ColumnGroups = "groups"
+	// ColumnAttributes holds the unit's attributes as a JSON array, as in the
+	// API; it is empty when the unit has none.
+	ColumnAttributes = "attributes"
 )
 
 // tacticalNameColumns and symbolColumns list the columns of the parts of a
@@ -57,6 +61,7 @@ func csvColumns(withGroups bool) []string {
 	cols := []string{ColumnID, ColumnName}
 	cols = append(cols, tacticalNameColumns...)
 	cols = append(cols, symbolColumns...)
+	cols = append(cols, ColumnAttributes)
 	if withGroups {
 		cols = append(cols, ColumnGroups)
 	}
@@ -91,6 +96,15 @@ func WriteCSV(w io.Writer, list []models.Unit, withGroups bool) error {
 		for _, f := range sym.Fields() {
 			record = append(record, *f)
 		}
+		attrs := ""
+		if len(u.Attributes) > 0 {
+			b, err := json.Marshal(u.Attributes)
+			if err != nil {
+				return fmt.Errorf("encode attributes of unit %s: %w", u.ID, err)
+			}
+			attrs = string(b)
+		}
+		record = append(record, attrs)
 		if withGroups {
 			names := make([]string, len(u.Groups))
 			for j, g := range u.Groups {
@@ -117,6 +131,8 @@ type ImportRow struct {
 	// TacticalName and Symbol point to nil to clear them.
 	TacticalName **models.TacticalName
 	Symbol       **models.UnitSymbol
+	// Attributes points to the unit's attributes; an empty list clears them.
+	Attributes *[]models.UnitAttribute
 	// Groups are group names; a non-nil empty slice removes all groups.
 	Groups []string
 }
@@ -166,6 +182,7 @@ func ParseCSV(r io.Reader) ([]ImportRow, error) {
 	}
 	hasTacticalName, hasSymbol := hasAny(tacticalNameColumns), hasAny(symbolColumns)
 	_, hasGroups := index[ColumnGroups]
+	_, hasAttributes := index[ColumnAttributes]
 
 	var rows []ImportRow
 	for {
@@ -212,6 +229,15 @@ func ParseCSV(r io.Reader) ([]ImportRow, error) {
 				*f = get(symbolColumns[i])
 			}
 			row.Symbol = &sym
+		}
+		if hasAttributes {
+			attrs := []models.UnitAttribute{}
+			if v := get(ColumnAttributes); v != "" {
+				if err := json.Unmarshal([]byte(v), &attrs); err != nil {
+					return nil, fmt.Errorf("%w: line %d: attributes must be a JSON array of {key, type, value} objects", ErrInvalidCSV, line)
+				}
+			}
+			row.Attributes = &attrs
 		}
 		if hasGroups {
 			row.Groups = []string{}
@@ -299,6 +325,9 @@ func importRow(tx *gorm.DB, row ImportRow, groupIDs map[string]uint, by *models.
 		}
 		if row.Symbol != nil {
 			in.Symbol = *row.Symbol
+		}
+		if row.Attributes != nil {
+			in.Attributes = *row.Attributes
 		}
 		if ids != nil {
 			in.GroupIDs = ids

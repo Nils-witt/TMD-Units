@@ -242,6 +242,33 @@
     "function": "Funktion",
     "number": "Nummer"
   },
+  "unitAttributes": {
+    "title": "Attribute",
+    "none": "Keine Attribute",
+    "key": "Name",
+    "type": "Typ",
+    "value": "Wert",
+    "add": "Attribut hinzufügen",
+    "remove": "Attribut entfernen",
+    "yes": "Ja",
+    "no": "Nein",
+    "types": {
+      "text": "Text",
+      "number": "Zahl",
+      "boolean": "Ja/Nein",
+      "date": "Datum",
+      "url": "Link"
+    },
+    "errors": {
+      "keyRequired": "Name erforderlich",
+      "keyDuplicate": "Name doppelt vergeben",
+      "keyInvalid": "Ungültiger Name",
+      "text": "Text zu lang oder mit ungültigen Zeichen",
+      "number": "Zahl eingeben",
+      "date": "Gültiges Datum eingeben",
+      "url": "http(s)-Link eingeben"
+    }
+  },
   "map": {
     "empty": "Noch keine Einheit hat eine Position",
     "setPosition": "Neue Position setzen",
@@ -322,7 +349,8 @@
         "name": "Name",
         "symbol": "taktisches Zeichen",
         "tacticalName": "taktischer Name",
-        "mapStyleUrl": "Kartenstil"
+        "mapStyleUrl": "Kartenstil",
+        "attributes": "Attribute"
       },
       "enabled": "aktiviert",
       "disabled": "deaktiviert"

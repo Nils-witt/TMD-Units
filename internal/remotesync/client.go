@@ -177,6 +177,9 @@ type RemoteUnit struct {
 	Status       *RemoteStatus        `json:"status"`
 	Symbol       *models.UnitSymbol   `json:"symbol"`
 	TacticalName *models.TacticalName `json:"tacticalName"`
+	// Attributes are the unit's free attributes. Remotes from before
+	// attributes existed send none.
+	Attributes []models.UnitAttribute `json:"attributes"`
 	// Requests are the unit's FMS 0, 5 and 9 reports. Remotes from before
 	// requests existed send none.
 	Requests []RemoteStatusRequest `json:"requests"`
@@ -209,7 +212,7 @@ type RemoteStatus struct {
 
 // Input returns the unit's editable fields.
 func (u *RemoteUnit) Input() units.Input {
-	in := units.Input{Name: u.Name, Symbol: u.Symbol, TacticalName: u.TacticalName}
+	in := units.Input{Name: u.Name, Symbol: u.Symbol, TacticalName: u.TacticalName, Attributes: u.Attributes}
 	if p := u.Position; p != nil && p.Timestamp != nil {
 		in.Position = &units.Position{
 			Latitude: p.Lat, Longitude: p.Lon, Height: p.Height, Accuracy: p.Accuracy,

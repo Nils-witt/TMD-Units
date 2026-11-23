@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -105,8 +106,11 @@ type Unit struct {
 	Symbol *UnitSymbol `gorm:"serializer:json;type:jsonb"`
 	// TacticalName is nil when the unit has no tactical name.
 	TacticalName *TacticalName `gorm:"serializer:json;type:jsonb"`
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// Attributes are freely defined, typed key/value pairs, in the order
+	// they were given; nil when the unit has none.
+	Attributes []UnitAttribute `gorm:"serializer:json;type:jsonb"`
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 	// CreatedByID and UpdatedByID become nil when that user is deleted.
 	CreatedByID *uint
 	CreatedBy   *User `gorm:"constraint:OnDelete:SET NULL"`
@@ -175,6 +179,16 @@ func (n *TacticalName) Fields() []*string {
 	return []*string{
 		&n.Organisation, &n.RegionalAssociation, &n.LocalAssociation, &n.Function, &n.Number,
 	}
+}
+
+// UnitAttribute is one freely defined attribute of a unit. Value is the
+// JSON value matching Type (see units.AttributeType): a string for text,
+// date and url, a number for number and a boolean for boolean. It is stored
+// and served as JSON.
+type UnitAttribute struct {
+	Key   string          `json:"key"`
+	Type  string          `json:"type"`
+	Value json.RawMessage `json:"value"`
 }
 
 // HasPosition reports whether the unit's position is known.

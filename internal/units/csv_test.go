@@ -105,3 +105,35 @@ func TestParseCSV(t *testing.T) {
 		})
 	}
 }
+
+func TestCSVAttributes(t *testing.T) {
+	attrs := []models.UnitAttribute{attr("Kennzeichen", "text", `"B-RK 1, \"x\""`), attr("Sitze", "number", `4`)}
+	list := []models.Unit{{ID: uuid.New(), Name: "A", Attributes: attrs}, {ID: uuid.New(), Name: "B"}}
+	var buf bytes.Buffer
+	if err := WriteCSV(&buf, list, false); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := ParseCSV(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows[0].Attributes == nil || !sameAttributes(*rows[0].Attributes, attrs) {
+		t.Errorf("attributes = %v, want %s", rows[0].Attributes, attrsString(attrs))
+	}
+	if a := rows[1].Attributes; a == nil || len(*a) != 0 {
+		t.Errorf("attributes of unit without any = %v, want empty non-nil", a)
+	}
+
+	rows, err = ParseCSV(strings.NewReader("name\nA\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows[0].Attributes != nil {
+		t.Errorf("attributes without the column = %v, want nil", rows[0].Attributes)
+	}
+
+	_, err = ParseCSV(strings.NewReader("name;attributes\nA;{not json\n"))
+	if !errors.Is(err, ErrInvalidCSV) || !strings.Contains(err.Error(), "line 2") {
+		t.Errorf("invalid attributes: err = %v, want ErrInvalidCSV naming line 2", err)
+	}
+}

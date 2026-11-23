@@ -17,8 +17,14 @@ import { useGroups } from '../../hooks/useGroups';
 import { errorMessage } from '../../lib/errors';
 import { KMH_PER_MS } from '../../lib/format';
 import { cleanTacticalName } from '../../lib/tacticalName';
+import {
+  attributeDraftErrors,
+  attributesFromDrafts,
+  toAttributeDrafts,
+} from '../../lib/unitAttributes';
 import { cleanSymbol } from '../../lib/unitSymbol';
 import TacticalNameFields from './TacticalNameFields';
+import UnitAttributesFields from './UnitAttributesFields';
 import UnitSymbolFields from './UnitSymbolFields';
 import './UnitDialog.scss';
 
@@ -71,6 +77,9 @@ function UnitForm({
   const [course, setCourse] = useState(initial?.course != null ? String(initial.course) : '');
   const [symbol, setSymbol] = useState(unit?.symbol ?? {});
   const [tacticalName, setTacticalName] = useState(unit?.tacticalName ?? {});
+  const [attributes, setAttributes] = useState(() => toAttributeDrafts(unit?.attributes ?? []));
+  const attributeErrors = attributeDraftErrors(attributes);
+  const attributesInvalid = attributeErrors.some((e) => e.key != null || e.value != null);
   const [groups, setGroups] = useState<GroupRef[]>(unit?.groups ?? []);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -144,6 +153,7 @@ function UnitForm({
           name: name.trim(),
           symbol: cleanSymbol(symbol),
           tacticalName: cleanTacticalName(tacticalName),
+          attributes: attributesFromDrafts(attributes),
           ...(isAdmin ? { groupIds: groups.map((g) => g.id) } : {}),
         },
         position,
@@ -173,6 +183,14 @@ function UnitForm({
       <Stack spacing={1.5}>
         <Typography variant="subtitle2">{t('unitSymbol.title')}</Typography>
         <UnitSymbolFields value={symbol} tacticalName={tacticalName} onChange={setSymbol} />
+      </Stack>
+      <Stack spacing={1.5}>
+        <Typography variant="subtitle2">{t('unitAttributes.title')}</Typography>
+        <UnitAttributesFields
+          value={attributes}
+          errors={attributeErrors}
+          onChange={setAttributes}
+        />
       </Stack>
       {isAdmin && (
         <Autocomplete
@@ -267,7 +285,7 @@ function UnitForm({
         <Button
           type="submit"
           variant="contained"
-          disabled={submitting || !name.trim() || positionIncomplete}
+          disabled={submitting || !name.trim() || positionIncomplete || attributesInvalid}
         >
           {editing ? t('common.save') : t('common.create')}
         </Button>

@@ -1,0 +1,21 @@
+.unit-attributes-fields__row {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.unit-attributes-fields__key {
+  flex: 1 1 140px;
+}
+
+.unit-attributes-fields__type {
+  flex: 0 1 120px;
+}
+
+.unit-attributes-fields__value {
+  flex: 2 1 180px;
+  min-width: 0;
+}
+
+.unit-attributes-fields__remove {
+  flex: 0 0 auto;
+}

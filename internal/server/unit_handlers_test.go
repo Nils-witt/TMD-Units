@@ -3,10 +3,12 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +27,7 @@ func TestUnitPatchRequest(t *testing.T) {
 			Position:     &units.Position{Latitude: 1, Longitude: 2, Height: &height, Timestamp: ts},
 			Symbol:       &models.UnitSymbol{Grundzeichen: "fahrzeug"},
 			TacticalName: &models.TacticalName{Number: "1"},
+			Attributes:   []models.UnitAttribute{{Key: "a", Type: "boolean", Value: json.RawMessage("true")}},
 			GroupIDs:     []uint{1, 2},
 		}
 	}
@@ -51,8 +54,18 @@ func TestUnitPatchRequest(t *testing.T) {
 			}
 		}},
 		{"groups replaced", `{"groupIds":[3]}`, func(t *testing.T, in units.Input) {
-			if !slices.Equal(in.GroupIDs, []uint{3}) || in.Symbol == nil {
+			if !slices.Equal(in.GroupIDs, []uint{3}) || in.Symbol == nil || len(in.Attributes) != 1 {
 				t.Errorf("got %+v, want only groups replaced", in)
+			}
+		}},
+		{"attributes replaced", `{"attributes":[{"key":"b","type":"number","value":2}]}`, func(t *testing.T, in units.Input) {
+			if len(in.Attributes) != 1 || in.Attributes[0].Key != "b" || string(in.Attributes[0].Value) != "2" || in.Symbol == nil {
+				t.Errorf("got %+v, want only attributes replaced", in)
+			}
+		}},
+		{"null attributes clear", `{"attributes":null}`, func(t *testing.T, in units.Input) {
+			if in.Attributes != nil || in.Name != "Alpha" {
+				t.Errorf("got %+v, want attributes cleared", in)
 			}
 		}},
 	}
@@ -74,7 +87,7 @@ func TestUnitPatchRequest(t *testing.T) {
 }
 
 func TestUnitPatchRequestErrors(t *testing.T) {
-	for _, body := range []string{`{"name":null}`, `{"name":5}`, `{"symbol":"x"}`, `{"groupIds":[-1]}`} {
+	for _, body := range []string{`{"name":null}`, `{"name":5}`, `{"symbol":"x"}`, `{"groupIds":[-1]}`, `{"attributes":{}}`} {
 		var req unitPatchRequest
 		if err := json.Unmarshal([]byte(body), &req); err != nil {
 			t.Fatal(err)
@@ -250,5 +263,27 @@ func TestUnitResponseRequests(t *testing.T) {
 	}
 	if resp := toUnitResponse(&models.Unit{Name: "Bravo"}); resp.Requests == nil {
 		t.Error("requests = null, want []")
+	}
+}
+
+func TestUnitResponseAttributes(t *testing.T) {
+	b, err := json.Marshal(toUnitResponse(&models.Unit{Name: "Alpha"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"attributes":[]`) {
+		t.Errorf("unit without attributes = %s, want attributes []", b)
+	}
+	resp := toUnitResponse(&models.Unit{Name: "Bravo", Attributes: []models.UnitAttribute{{Key: "a", Type: "text", Value: json.RawMessage(`"x"`)}}})
+	if b, _ := json.Marshal(resp.Attributes); string(b) != `[{"key":"a","type":"text","value":"x"}]` {
+		t.Errorf("attributes = %s", b)
+	}
+}
+
+func TestWriteUnitErrorAttributes(t *testing.T) {
+	w := httptest.NewRecorder()
+	writeUnitError(w, fmt.Errorf("%w: attribute 1: bad", units.ErrInvalidAttributes))
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "attribute 1: bad") {
+		t.Errorf("status = %d, body = %s; want 400 with the details", w.Code, w.Body.String())
 	}
 }
