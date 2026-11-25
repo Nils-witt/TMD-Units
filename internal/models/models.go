@@ -218,6 +218,34 @@ type UnitPosition struct {
 	RecordedBy   *User `gorm:"constraint:OnDelete:SET NULL"`
 }
 
+// UnitAlarm is an alarm sent to a unit, e.g. by a dispatch system. Alarms
+// are a history: they are never acknowledged, and are deleted with the unit.
+// An alarm with a ReferenceID is unique per unit by it (see database.Connect),
+// so sending it again updates it instead of adding another.
+type UnitAlarm struct {
+	ID     uuid.UUID `gorm:"type:uuid;primaryKey"`
+	UnitID uuid.UUID `gorm:"type:uuid;not null;index:idx_unit_alarms_unit_timestamp,priority:1"`
+	Unit   *Unit     `gorm:"constraint:OnDelete:CASCADE"`
+	// Latitude and Longitude (WGS 84 degrees) are where the unit is alarmed to.
+	Latitude  float64 `gorm:"type:double precision;not null"`
+	Longitude float64 `gorm:"type:double precision;not null"`
+	Title     string  `gorm:"not null"`
+	// Address, Details and ReferenceID are nil when not given. ReferenceID is
+	// the sender's own ID of the alarm, e.g. its incident number.
+	Address     *string
+	Details     *string
+	ReferenceID *string
+	// Timestamp is when the alarm was raised.
+	Timestamp time.Time `gorm:"not null;index:idx_unit_alarms_unit_timestamp,priority:2,sort:desc"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	// CreatedByID and UpdatedByID become nil when that user is deleted.
+	CreatedByID *uint
+	CreatedBy   *User `gorm:"constraint:OnDelete:SET NULL"`
+	UpdatedByID *uint
+	UpdatedBy   *User `gorm:"constraint:OnDelete:SET NULL"`
+}
+
 // AuditLog is one entry of the audit log: who did what to which record, and
 // from where. Entries are never changed; old ones may be deleted after the
 // retention period (see audit.Service.Cleanup).

@@ -14,13 +14,18 @@ const (
 	EventCreated EventType = "created"
 	EventUpdated EventType = "updated"
 	EventDeleted EventType = "deleted"
+	// EventAlarm reports an alarm sent to the unit ID, new or updated (see
+	// Service.RecordAlarm); the unit itself is unchanged.
+	EventAlarm EventType = "alarm"
 )
 
-// Event describes a change to a unit. Unit is nil for EventDeleted.
+// Event describes a change to a unit. Unit is set for EventCreated and
+// EventUpdated, Alarm for EventAlarm.
 type Event struct {
-	Type EventType
-	ID   uuid.UUID
-	Unit *models.Unit
+	Type  EventType
+	ID    uuid.UUID
+	Unit  *models.Unit
+	Alarm *models.UnitAlarm
 }
 
 // subscriberBuffer is how many events a subscriber may fall behind before it

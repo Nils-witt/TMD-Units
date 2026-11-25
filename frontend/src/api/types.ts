@@ -294,9 +294,34 @@ export interface UnitImportResult {
   unchanged: number;
 }
 
-/** A message on the unit event stream (GET /api/units/events). */
+/** An alarm sent to a unit (POST /api/units/{id}/alarms), e.g. by a
+ * dispatch system. Alarms are a history; resending one with the same
+ * reference ID updates it. */
+export interface UnitAlarm {
+  id: string;
+  unitId: string;
+  lat: number;
+  lon: number;
+  title: string;
+  address: string | null;
+  details: string | null;
+  /** The sender's own ID of the alarm, e.g. its incident number. */
+  referenceId: string | null;
+  /** When the alarm was raised. */
+  timestamp: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Null once that user is deleted. */
+  createdBy: UserRef | null;
+  updatedBy: UserRef | null;
+}
+
+/** A message on the unit event stream (GET /api/units/events). For alarm,
+ * id is the alarmed unit's. */
 export type UnitEvent =
-  { type: 'created' | 'updated'; id: string; unit: Unit } | { type: 'deleted'; id: string };
+  | { type: 'created' | 'updated'; id: string; unit: Unit }
+  | { type: 'deleted'; id: string }
+  | { type: 'alarm'; id: string; alarm: UnitAlarm };
 
 export const AUDIT_ACTIONS = [
   'auth.login',
@@ -317,6 +342,8 @@ export const AUDIT_ACTIONS = [
   'unit.update',
   'unit.delete',
   'unit.request_ack',
+  'unit.alarm_create',
+  'unit.alarm_update',
   'settings.update',
 ] as const;
 

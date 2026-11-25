@@ -46,6 +46,10 @@ function describeDetails(e: AuditLogEntry, t: TFunction, locale: string): string
   if (typeof d.expiresAt === 'string') {
     parts.push(t('auditLog.details.expiresAt', { date: fmtDate(d.expiresAt, locale) }));
   }
+  if (typeof d.title === 'string') parts.push(d.title);
+  if (typeof d.referenceId === 'string') {
+    parts.push(t('auditLog.details.reference', { ref: d.referenceId }));
+  }
   if (Array.isArray(d.changed)) {
     const fields = d.changed.map((f) =>
       t(`auditLog.details.fields.${String(f)}`, { defaultValue: String(f) }),

@@ -21,10 +21,11 @@ import * as maplibregl from 'maplibre-gl';
 import type { StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-import type { Position, PositionHistoryEntry, Unit } from '../api/types';
+import type { Position, PositionHistoryEntry, Unit, UnitAlarm } from '../api/types';
 import ErrorBanner from '../components/ErrorBanner';
 import { useApi } from '../hooks/useApi';
 import { useSettings } from '../hooks/useSettings';
+import { useUnitAlarms } from '../hooks/useUnitAlarms';
 import { useUnitPositions } from '../hooks/useUnitPositions';
 import { useUnits } from '../hooks/useUnits';
 import { errorMessage } from '../lib/errors';
@@ -83,6 +84,8 @@ const SYMBOL_HEIGHT_KEY = 'map.symbolHeight';
 // layers itself, so the color can't come from the MUI theme.
 const TRACK_SOURCE = 'gps-track';
 const TRACK_COLOR = '#d32f2f';
+// Distinct from the track's red, which runs right up to the unit.
+const ALARM_COLOR = '#ff6d00';
 const TRACK_POINTS_LAYER = `${TRACK_SOURCE}-points`;
 // Including the stroke; also the popup's offset and the extra hit area.
 const TRACK_POINT_RADIUS = 6;
@@ -298,6 +301,9 @@ export default function MapPage() {
     since,
     rangeTo,
   );
+  // The tracked unit's latest alarm is shown with its track.
+  const { data: trackAlarms } = useUnitAlarms(trackUnit?.id ?? null);
+  const trackAlarm = trackAlarms[0] ?? null;
   useEffect(() => {
     if (trackId === null || trackSpan === null || trackSpan === 'custom') return;
     const timer = setInterval(() => setNow(Date.now()), 60_000);
@@ -367,6 +373,7 @@ export default function MapPage() {
           positions={track}
         />
       )}
+      {map && trackUnit && trackAlarm && <AlarmMarker map={map} alarm={trackAlarm} />}
       {map &&
         placed.map((u) => (
           <UnitMarker
@@ -682,6 +689,45 @@ function TrackPointPopupContent({ entry }: { entry: PositionHistoryEntry }) {
         {t('unitRow.by', { name: recordedBy?.username ?? t('unitRow.deletedUser') })}
       </div>
     </>
+  );
+}
+
+/** A red pin where a unit is alarmed to, with the alarm in its popup. */
+function AlarmMarker({ map, alarm }: { map: maplibregl.Map; alarm: UnitAlarm }) {
+  const { t, i18n } = useTranslation();
+  const [popupContent] = useState(() => document.createElement('div'));
+  const [marker] = useState(() =>
+    new maplibregl.Marker({ color: ALARM_COLOR }).setPopup(
+      new maplibregl.Popup({ className: 'map-page__popup', offset: 30 }).setDOMContent(
+        popupContent,
+      ),
+    ),
+  );
+
+  useEffect(() => {
+    marker.setLngLat([alarm.lon, alarm.lat]);
+  }, [marker, alarm.lat, alarm.lon]);
+
+  useEffect(() => {
+    marker.addTo(map);
+    return () => {
+      marker.remove();
+    };
+  }, [map, marker]);
+
+  return createPortal(
+    <>
+      <strong>
+        {t('unitAlarms.alarm')}: {alarm.title}
+      </strong>
+      {alarm.address && <div>{alarm.address}</div>}
+      {alarm.details && <div className="map-page__popup-details">{alarm.details}</div>}
+      <div className="map-page__popup-time">
+        {fmtDate(alarm.timestamp, i18n.language)}
+        {alarm.referenceId && ` · ${alarm.referenceId}`}
+      </div>
+    </>,
+    popupContent,
   );
 }
 

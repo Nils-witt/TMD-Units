@@ -39,6 +39,11 @@ const (
 	ActionUnitDelete        Action = "unit.delete"
 	// ActionUnitRequestAck is an acknowledged FMS 0, 5 or 9 request.
 	ActionUnitRequestAck Action = "unit.request_ack"
+	// ActionUnitAlarmCreate and ActionUnitAlarmUpdate are an alarm sent to
+	// the unit, new or replacing one with the same reference ID; Details
+	// holds the alarm's ID, title and reference ID.
+	ActionUnitAlarmCreate Action = "unit.alarm_create"
+	ActionUnitAlarmUpdate Action = "unit.alarm_update"
 	// ActionSettingsUpdate has no target; Details names the changed fields.
 	ActionSettingsUpdate Action = "settings.update"
 )

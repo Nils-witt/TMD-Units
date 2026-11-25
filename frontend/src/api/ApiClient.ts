@@ -27,6 +27,7 @@ import type {
   SyncRemote,
   SyncRemoteInput,
   Unit,
+  UnitAlarm,
   UnitImportResult,
   UnitInput,
   UpdateUserInput,
@@ -309,6 +310,12 @@ export class ApiClient {
     if (range.to) params.set('to', range.to);
     const query = params.size > 0 ? `?${params}` : '';
     return this.getJson(`/api/units/${id}/positions${query}`);
+  }
+
+  /** The unit's alarms, newest first (GET /api/units/{id}/alarms). */
+  listUnitAlarms(id: string, limit?: number): Promise<UnitAlarm[]> {
+    const query = limit ? `?limit=${limit}` : '';
+    return this.getJson(`/api/units/${id}/alarms${query}`);
   }
 
   /** The local units as CSV (GET /api/units/csv); the groups column is only

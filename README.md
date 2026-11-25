@@ -83,6 +83,12 @@ The unit position history is kept forever unless `POSITION_HISTORY_RETENTION` is
 
 With `AMQP_URL` and `SERVICE_DISCOVERY_SECRET` (shared by the TMD services, at least 32 bytes) set, the server announces itself at `SERVICE_URL` (e.g. `http://units:8080`) on the RabbitMQ topic exchange `tmd.services` every `SERVICE_ANNOUNCE_INTERVAL` (default `1m`), and hands API tokens to the services listed in `SERVICE_TOKEN_CLIENTS` (default `api`): the TMD API finds the units server this way, without a hand-made token. Requests and replies are signed with the secret, and the token travels encrypted. Each token acts as the account `service:<client>` (created on first use; not an administrator, no password, so nobody can sign in as it), lasts `SERVICE_TOKEN_TTL` (default `168h`) and replaces the token that instance of the service had before. Issued tokens appear in the audit log. Deleting the account ends its tokens; the service gets a new one on its next 401. `internal/servicebus` is a verbatim copy of the tile server's package (also in address-serv and the API); keep all copies identical.
 
+### Alarms
+
+Other systems, such as a dispatch system, alarm a unit with `POST /api/units/{id}/alarms`, authenticated like any API client (an API token, an OIDC access token or a service token). An alarm needs coordinates (`lat`, `lon`) and a `title`; an `address`, free-text `details` (line breaks allowed), a `referenceId` (the sender's own ID, e.g. the incident number) and the `timestamp` it was raised (default: now) are optional. Alarms are kept as a history per unit and need no acknowledgement. The `referenceId` is unique per unit: sending an alarm with it again updates that alarm instead of adding another, so senders can resend and correct alarms safely.
+
+Each alarm is pushed on the unit event stream as `{type: "alarm", id: <unit id>, alarm}`; the UI then shows it in a notification, under **Alarms** on the Units page, and as an orange pin while the unit's track is shown on the map. Alarms are deleted with their unit, and are not synced: an alarm sent to a mirrored unit stays on the instance that received it. Receiving and updating alarms is recorded in the audit log (`unit.alarm_create`, `unit.alarm_update`), without the coordinates.
+
 ### Audit log
 
 Administrators can see who signed in (and who failed to), and who created, changed or deleted which users, API tokens, API keys, sync remotes and units, on the Audit log page or at `GET /api/audit-log`. A unit's position is never recorded, including removing it, since the position history already covers it; an update that changes only the position leaves no entry. Entries are kept forever unless `AUDIT_LOG_RETENTION` is set to a duration (e.g. `2160h` for 90 days); older entries are then deleted hourly.
@@ -126,6 +132,8 @@ The full API is described in [`api/openapi.yaml`](api/openapi.yaml) (OpenAPI 3.1
 | POST   | `/api/units/{id}/status-requests/{code}/acknowledge` | Acknowledges the unit's request of code 0, 5 or 9; a synced unit's at its remote |
 | DELETE | `/api/units/{id}/status` | Clears the FMS status |
 | GET    | `/api/units/{id}/positions?limit=&since=&to=` | Position history, newest first; `since` and `to` (RFC 3339) limit it to measurements in that timeframe |
+| GET    | `/api/units/{id}/alarms?limit=&since=&to=` | The unit's alarms, newest first; same parameters as the position history |
+| POST   | `/api/units/{id}/alarms` | `{lat, lon, title, address?, details?, referenceId?, timestamp?}`: alarms the unit (201); the `referenceId` of one of its alarms updates that one (200) |
 | PUT    | `/api/units/{id}`  | Same body as POST; a missing position clears it |
 | PATCH  | `/api/units/{id}`  | Changes only the fields sent; null clears. A PUT or PATCH that changes nothing leaves `updatedAt` alone and sends no event |
 | DELETE | `/api/units/{id}`  | Delete unit                          |

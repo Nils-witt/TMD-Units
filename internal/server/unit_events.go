@@ -24,11 +24,12 @@ const (
 )
 
 // unitEventMessage is one message on the unit event stream. Unit is set for
-// created and updated, ID for every type.
+// created and updated, Alarm for alarm, ID (the unit's) for every type.
 type unitEventMessage struct {
-	Type units.EventType `json:"type"`
-	ID   uuid.UUID       `json:"id"`
-	Unit *unitResponse   `json:"unit,omitempty"`
+	Type  units.EventType `json:"type"`
+	ID    uuid.UUID       `json:"id"`
+	Unit  *unitResponse   `json:"unit,omitempty"`
+	Alarm *alarmResponse  `json:"alarm,omitempty"`
 }
 
 // handleUnitEvents upgrades to a WebSocket and pushes every unit change until
@@ -128,6 +129,10 @@ func (s *Server) writeUnitEvent(ctx context.Context, conn *websocket.Conn, ev un
 	if ev.Unit != nil {
 		resp := toUnitResponse(ev.Unit)
 		msg.Unit = &resp
+	}
+	if ev.Alarm != nil {
+		resp := toAlarmResponse(ev.Alarm)
+		msg.Alarm = &resp
 	}
 	ctx, cancel := context.WithTimeout(ctx, eventsWriteTimeout)
 	defer cancel()

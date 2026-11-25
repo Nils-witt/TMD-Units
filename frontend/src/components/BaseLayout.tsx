@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import AlarmSnackbar from './AlarmSnackbar.tsx';
 import Footer from './Footer.tsx';
 import LanguageSwitcher from './LanguageSwitcher.tsx';
 import { useAuth } from '../hooks/useAuth.ts';
@@ -167,6 +168,7 @@ export default function BaseLayout() {
       <Container maxWidth={false} className="base-layout__content">
         <Outlet />
       </Container>
+      <AlarmSnackbar />
       <Footer />
     </Box>
   );

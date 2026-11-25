@@ -12,6 +12,7 @@ import { useUnits } from '../hooks/useUnits';
 import { errorMessage } from '../lib/errors';
 import type { SortDirection } from '../lib/sort';
 import UnitDialog, { type UnitSubmission } from './units-page/UnitDialog';
+import UnitAlarmsDialog from './units-page/UnitAlarmsDialog';
 import UnitHistoryDialog from './units-page/UnitHistoryDialog';
 import UnitsListCard from './units-page/UnitsListCard';
 import { filterUnits, sortUnits, type UnitSortKey } from './units-page/unitSort';
@@ -32,6 +33,8 @@ export default function UnitsPage() {
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyUnit, setHistoryUnit] = useState<Unit | null>(null);
+  const [alarmsOpen, setAlarmsOpen] = useState(false);
+  const [alarmsUnit, setAlarmsUnit] = useState<Unit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<UnitImportResult | null>(null);
@@ -60,6 +63,11 @@ export default function UnitsPage() {
   const openHistory = (unit: Unit) => {
     setHistoryUnit(unit);
     setHistoryOpen(true);
+  };
+
+  const openAlarms = (unit: Unit) => {
+    setAlarmsUnit(unit);
+    setAlarmsOpen(true);
   };
 
   const onSubmit = async ({ unit, position }: UnitSubmission) => {
@@ -178,6 +186,7 @@ export default function UnitsPage() {
         onSort={onSort}
         onEdit={openDialog}
         onHistory={openHistory}
+        onAlarms={openAlarms}
         onDelete={(u) => void onDelete(u)}
       />
       <UnitDialog
@@ -191,6 +200,7 @@ export default function UnitsPage() {
         unit={historyUnit}
         onClose={() => setHistoryOpen(false)}
       />
+      <UnitAlarmsDialog open={alarmsOpen} unit={alarmsUnit} onClose={() => setAlarmsOpen(false)} />
     </Box>
   );
 }

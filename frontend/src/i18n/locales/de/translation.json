@@ -203,7 +203,9 @@
     "historyAria": "Positionsverlauf von {{name}}",
     "syncedFrom": "Synchronisiert von {{name}}",
     "syncedHint": "Gespiegelt von {{name}}; kann nur dort geändert werden.",
-    "syncUser": "Synchronisation von {{name}}"
+    "syncUser": "Synchronisation von {{name}}",
+    "alarms": "Alarme",
+    "alarmsAria": "Alarme von {{name}}"
   },
   "unitHistory": {
     "title": "Positionsverlauf von {{name}}",
@@ -214,6 +216,16 @@
     "course": "Kurs",
     "recorded": "Erfasst",
     "empty": "Noch keine Positionen erfasst"
+  },
+  "unitAlarms": {
+    "title": "Alarme von {{name}}",
+    "raised": "Ausgelöst",
+    "alarm": "Alarm",
+    "address": "Adresse",
+    "reference": "Referenz",
+    "received": "Empfangen",
+    "empty": "Noch keine Alarme",
+    "notification": "Alarm für {{name}}"
   },
   "unitsListCard": {
     "name": "Name",
@@ -325,6 +337,8 @@
       "unit.update": "Einheit geändert",
       "unit.delete": "Einheit gelöscht",
       "unit.request_ack": "Statusanfrage quittiert",
+      "unit.alarm_create": "Einheit alarmiert",
+      "unit.alarm_update": "Alarm der Einheit aktualisiert",
       "settings.update": "Einstellungen geändert"
     },
     "targetTypes": {
@@ -353,7 +367,8 @@
         "attributes": "Attribute"
       },
       "enabled": "aktiviert",
-      "disabled": "deaktiviert"
+      "disabled": "deaktiviert",
+      "reference": "Referenz {{ref}}"
     }
   },
   "settings": {

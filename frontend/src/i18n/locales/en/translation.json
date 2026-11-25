@@ -203,7 +203,9 @@
     "historyAria": "Position history of {{name}}",
     "syncedFrom": "Synced from {{name}}",
     "syncedHint": "Mirrored from {{name}}; it can only be changed there.",
-    "syncUser": "sync from {{name}}"
+    "syncUser": "sync from {{name}}",
+    "alarms": "Alarms",
+    "alarmsAria": "Alarms of {{name}}"
   },
   "unitHistory": {
     "title": "Position history of {{name}}",
@@ -214,6 +216,16 @@
     "course": "Course",
     "recorded": "Recorded",
     "empty": "No positions recorded yet"
+  },
+  "unitAlarms": {
+    "title": "Alarms of {{name}}",
+    "raised": "Raised",
+    "alarm": "Alarm",
+    "address": "Address",
+    "reference": "Reference",
+    "received": "Received",
+    "empty": "No alarms yet",
+    "notification": "Alarm for {{name}}"
   },
   "unitsListCard": {
     "name": "Name",
@@ -325,6 +337,8 @@
       "unit.update": "Unit changed",
       "unit.delete": "Unit deleted",
       "unit.request_ack": "Status request acknowledged",
+      "unit.alarm_create": "Unit alarmed",
+      "unit.alarm_update": "Unit alarm updated",
       "settings.update": "Settings changed"
     },
     "targetTypes": {
@@ -353,7 +367,8 @@
         "attributes": "attributes"
       },
       "enabled": "enabled",
-      "disabled": "disabled"
+      "disabled": "disabled",
+      "reference": "Reference {{ref}}"
     }
   },
   "settings": {

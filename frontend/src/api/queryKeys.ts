@@ -17,5 +17,6 @@ export const queryKeys = {
   unitPositions: (id: string) => ['units', 'positions', id] as const,
   unitPositionsRange: (id: string, since: string | null, to: string | null) =>
     ['units', 'positions', id, since, to] as const,
+  unitAlarms: (id: string) => ['units', 'alarms', id] as const,
   version: ['version'] as const,
 };

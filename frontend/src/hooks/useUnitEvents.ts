@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../api/queryKeys';
 import type { GroupRef, Unit, UnitEvent } from '../api/types';
+import { notifyAlarm } from '../lib/alarmNotifications';
 import { useApi } from './useApi';
 
 const MIN_RETRY_MS = 1_000;
@@ -26,6 +27,12 @@ export function useUnitEvents(): void {
     let stopped = false;
 
     const apply = (event: UnitEvent) => {
+      if (event.type === 'alarm') {
+        // The unit itself is unchanged; an open alarm list refetches.
+        void queryClient.invalidateQueries({ queryKey: queryKeys.unitAlarms(event.id) });
+        notifyAlarm(event.alarm);
+        return;
+      }
       let groupsChanged = false;
       queryClient.setQueryData<Unit[]>(queryKeys.units, (units) => {
         // Nothing cached yet: the pending list fetch will include the change.

@@ -965,7 +965,9 @@ paths:
       description: |
         WebSocket endpoint (`ws://` / `wss://`). After the upgrade the server
         sends one JSON text message, a `UnitEvent`, for every unit that is
-        created, updated or deleted; it ignores anything the client sends.
+        created, updated or deleted, and for every alarm sent to a unit; it
+        ignores anything the client sends. Clients should skip event types
+        they don't know.
 
         Browsers can't set headers on a WebSocket, so besides the
         Authorization header the token is accepted as the subprotocols
@@ -1310,6 +1312,94 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PositionHistoryEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnitNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/units/{id}/alarms:
+    parameters:
+      - $ref: "#/components/parameters/UnitId"
+    get:
+      tags: [units]
+      summary: Get a unit's alarms
+      description: Lists the alarms sent to the unit, newest first.
+      operationId: getUnitAlarms
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of alarms to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 1000
+        - name: since
+          in: query
+          description: Only alarms raised at or after this time (RFC 3339).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: >
+            Only alarms raised at or before this time (RFC 3339). Must not be
+            before `since`.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: The unit's alarms.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UnitAlarm"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/UnitNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [units]
+      summary: Alarm a unit
+      description: >
+        Stores an alarm for the unit, e.g. from a dispatch system, and pushes
+        it on the unit event stream as an `alarm` event. Alarms are a history
+        and need no acknowledgement. An alarm with the `referenceId` of one
+        the unit already has replaces that one (200) instead of adding
+        another (201), so resending is safe. Mirrored units can be alarmed
+        too; their alarms stay on this instance and are not synced. Recorded
+        in the audit log as `unit.alarm_create` or `unit.alarm_update`.
+      operationId: createUnitAlarm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitAlarmInput"
+      responses:
+        "200":
+          description: Replaced the unit's alarm with the same reference ID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitAlarm"
+        "201":
+          description: Stored a new alarm.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitAlarm"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1714,6 +1804,9 @@ components:
         - unit.create
         - unit.update
         - unit.delete
+        - unit.request_ack
+        - unit.alarm_create
+        - unit.alarm_update
         - settings.update
 
     AuditTargetType:
@@ -2328,6 +2421,87 @@ components:
         message:
           type: string
 
+    UnitAlarmInput:
+      type: object
+      required: [lat, lon, title]
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+          description: Latitude (WGS 84) of where the unit is alarmed to.
+        lon:
+          type: number
+          minimum: -180
+          maximum: 180
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Trimmed; no control characters.
+        address:
+          type: [string, "null"]
+          maxLength: 500
+          description: Blank means none; no control characters.
+        details:
+          type: [string, "null"]
+          maxLength: 10000
+          description: Free text; may contain line breaks and tabs. Blank means none.
+        referenceId:
+          type: [string, "null"]
+          maxLength: 128
+          description: >
+            The sender's own ID of the alarm, e.g. its incident number. Unique
+            per unit: resending it updates the alarm. Blank means none.
+        timestamp:
+          type: string
+          format: date-time
+          description: When the alarm was raised; defaults to now.
+
+    UnitAlarm:
+      type: object
+      required: [id, unitId, lat, lon, title, address, details, referenceId, timestamp, createdAt, updatedAt, createdBy, updatedBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        unitId:
+          type: string
+          format: uuid
+        lat:
+          type: number
+        lon:
+          type: number
+        title:
+          type: string
+        address:
+          type: [string, "null"]
+        details:
+          type: [string, "null"]
+        referenceId:
+          type: [string, "null"]
+        timestamp:
+          type: string
+          format: date-time
+          description: When the alarm was raised.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the alarm was last received.
+        createdBy:
+          description: Who first sent it; null once that user is deleted.
+          oneOf:
+            - $ref: "#/components/schemas/UserRef"
+            - type: "null"
+        updatedBy:
+          description: Who last sent it; null once that user is deleted.
+          oneOf:
+            - $ref: "#/components/schemas/UserRef"
+            - type: "null"
+
     UnitEvent:
       type: object
       description: One change on the unit event stream.
@@ -2335,13 +2509,17 @@ components:
       properties:
         type:
           type: string
-          enum: [created, updated, deleted]
+          enum: [created, updated, deleted, alarm]
         id:
           type: string
           format: uuid
+          description: The unit's ID.
         unit:
-          description: The unit after the change; absent for `deleted`.
+          description: The unit after the change; only for `created` and `updated`.
           $ref: "#/components/schemas/Unit"
+        alarm:
+          description: The new or updated alarm; only for `alarm`.
+          $ref: "#/components/schemas/UnitAlarm"
 
     Version:
       type: object

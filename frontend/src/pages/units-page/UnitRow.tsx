@@ -13,11 +13,13 @@ export default function UnitRow({
   u,
   onEdit,
   onHistory,
+  onAlarms,
   onDelete,
 }: {
   u: Unit;
   onEdit: () => void;
   onHistory: () => void;
+  onAlarms: () => void;
   onDelete: () => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -125,6 +127,13 @@ export default function UnitRow({
             aria-label={t('unitRow.historyAria', { name: u.name })}
           >
             {t('unitRow.history')}
+          </Button>
+          <Button
+            size="small"
+            onClick={onAlarms}
+            aria-label={t('unitRow.alarmsAria', { name: u.name })}
+          >
+            {t('unitRow.alarms')}
           </Button>
           <Button
             size="small"

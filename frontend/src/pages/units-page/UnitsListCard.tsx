@@ -22,6 +22,7 @@ export default function UnitsListCard({
   onSort,
   onEdit,
   onHistory,
+  onAlarms,
   onDelete,
 }: {
   units: Unit[];
@@ -31,6 +32,7 @@ export default function UnitsListCard({
   onSort: (key: UnitSortKey) => void;
   onEdit: (u: Unit) => void;
   onHistory: (u: Unit) => void;
+  onAlarms: (u: Unit) => void;
   onDelete: (u: Unit) => void;
 }) {
   const { t } = useTranslation();
@@ -67,6 +69,7 @@ export default function UnitsListCard({
               u={u}
               onEdit={() => onEdit(u)}
               onHistory={() => onHistory(u)}
+              onAlarms={() => onAlarms(u)}
               onDelete={() => onDelete(u)}
             />
           ))}

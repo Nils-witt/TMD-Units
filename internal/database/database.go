@@ -57,7 +57,7 @@ func Connect(dsn string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("set up group join tables: %w", err)
 	}
-	if err := db.AutoMigrate(&models.User{}, &models.Session{}, &models.Group{}, &models.UserGroup{}, &models.SyncRemote{}, &models.Unit{}, &models.UnitGroup{}, &models.UnitPosition{}, &models.UnitStatusRequest{}, &models.AuditLog{}, &models.Setting{}, &models.APIKey{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.Session{}, &models.Group{}, &models.UserGroup{}, &models.SyncRemote{}, &models.Unit{}, &models.UnitGroup{}, &models.UnitPosition{}, &models.UnitStatusRequest{}, &models.UnitAlarm{}, &models.AuditLog{}, &models.Setting{}, &models.APIKey{}); err != nil {
 		return nil, fmt.Errorf("migrate database: %w", err)
 	}
 	// SSO accounts are looked up by subject alone. Not unique: accounts
@@ -65,6 +65,11 @@ func Connect(dsn string) (*gorm.DB, error) {
 	// subject, and a unique index would then fail to build.
 	if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_users_oidc_subject ON users (oidc_subject) WHERE oidc_subject IS NOT NULL`).Error; err != nil {
 		return nil, fmt.Errorf("create oidc subject index: %w", err)
+	}
+	// An alarm's reference ID identifies it within its unit, so a resent
+	// alarm updates the one it refers to.
+	if err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_unit_alarms_unit_reference ON unit_alarms (unit_id, reference_id) WHERE reference_id IS NOT NULL`).Error; err != nil {
+		return nil, fmt.Errorf("create alarm reference index: %w", err)
 	}
 	// Units positioned before the history existed start it with their current
 	// position. Afterwards every unit's position is in its history, so this
